@@ -13,26 +13,24 @@ async def insertTemp(message_data):
     return await insert_record(message_data, TempModel, "temperatura")
 
 async def getBPMRecords(time : str, message_data):
-    match time:
-        case "dia":
-            return await search_per_day(message_data, BPMModel, "bpm")
-        
-        case "semana":
-            return await search_per_week(message_data, BPMModel, "bpm")
-        
-        case "mes":
-            return await search_per_month(message_data, BPMModel, "bpm")
+    if time == "dia":
+        return await search_per_day(message_data, BPMModel, "bpm")
+    
+    if time == "semana":
+        return await search_per_week(message_data, BPMModel, "bpm")
+    
+    if time == "mes":
+        return await search_per_month(message_data, BPMModel, "bpm")
         
 async def getTempRecords(time : str, message_data):
-    match time:
-        case "dia":
-            return await search_per_day(message_data, TempModel, "temperatura")
-        
-        case "semana":
-            return await search_per_week(message_data, TempModel, "temperatura")
-        
-        case "mes":
-            return await search_per_month(message_data, TempModel, "temperatura")
+    if time == "dia":
+        return await search_per_day(message_data, TempModel, "temperatura")
+    
+    if time == "semana":
+        return await search_per_week(message_data, TempModel, "temperatura")
+    
+    if time == "mes":
+        return await search_per_month(message_data, TempModel, "temperatura")
 
 async def insert_record(message_data: Dict[str, Any], type_model: Model, fieldname: str) -> Dict[str, Any]:
     try:
@@ -59,12 +57,11 @@ async def insert_record(message_data: Dict[str, Any], type_model: Model, fieldna
         # Crear un nuevo registro
         new_record: Model = None
         
-        match fieldname:
-            case "bpm":
-                new_record = type_model.create(bpm = valor, fecha = now)
-                
-            case "temperatura":
-                new_record = type_model.create(temperatura = valor, fecha = now)
+        if fieldname == "bpm":
+            new_record = type_model.create(bpm = valor, fecha = now)
+            
+        if fieldname == "temperatura":
+            new_record = type_model.create(temperatura = valor, fecha = now)
 
         if not new_record:
             return {
