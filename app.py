@@ -18,20 +18,22 @@ async def ws_handler(websocket, path):
             logger.info(f"recieved message from a client: {message}")
             parsedData = json.loads(message)
             logger.info(f"parsed message: {parsedData}")
-            match parsedData.get("event"):
-                case "getBPMRecords":
-                    records = await getBPMRecords(parsedData.get("tiempo"), parsedData)
-                    await websocket.send(json.dumps(records))
-                case "getTempRecords":
-                    records  = await getTempRecords(parsedData.get("tiempo"), parsedData)
-                    await websocket.send(json.dumps(records))
-                
-                case "insertBPMRecords":
-                    response = await insertBpm(parsedData)
-                    await websocket.send(json.dumps(response))
-                case "insertTempRecords":
-                    response = await insertTemp(parsedData)
-                    await websocket.send(json.dumps(response))
+            if parsedData.get("event") == "getBPMRecords":
+                records = await getBPMRecords(parsedData.get("tiempo"), parsedData)
+                await websocket.send(json.dumps(records))
+                continue
+            if parsedData.get("event") == "getTempRecords":
+                records  = await getTempRecords(parsedData.get("tiempo"), parsedData)
+                await websocket.send(json.dumps(records))
+                continue
+            if parsedData.get("event") == "insertBPMRecords":
+                response = await insertBpm(parsedData)
+                await websocket.send(json.dumps(response))
+                continue
+            if parsedData.get("event") == "insertTempRecords":
+                response = await insertTemp(parsedData)
+                await websocket.send(json.dumps(response))
+                continue
             pass
     finally:
         # Eliminar el cliente cuando se desconecta
@@ -54,7 +56,7 @@ def on_mqtt_message(client, userdata, msg):
 
 # Configurar el cliente MQTT
 mqtt_client = mqtt.Client()
-mqtt_client.username_pw_set("polter", "123")
+#mqtt_client.username_pw_set("polter", "123")
 mqtt_client.on_message = on_mqtt_message
 
 async def main():
