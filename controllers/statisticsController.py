@@ -92,9 +92,29 @@ def calculate_mean(records: QuerySet, value_field_name: str) -> float:
     values = [getattr(record, value_field_name) for record in records]
     return sum(values) / len(values)
 
+import calendar
+from typing import Dict, Any, List
+from datetime import datetime
+from tortoise import fields
+import locale
+
+def calculate_mean1(records: List[Any], value_field_name: str) -> float:
+    """
+    Calcula la media de los registros para un campo específico.
+    """
+    if not records:
+        return 0.0
+    
+    try:
+        values = [float(getattr(record, value_field_name)) for record in records]
+        return sum(values) / len(values)
+    except Exception as e:
+        print(f"Error en calculate_mean: {str(e)}")
+        return 0.0
+
 async def search_per_month(message_data: Dict[str, Any], type_model: Any, value_field_name: str) -> Dict[str, Any]:
     try:
-        # Obtener el último registro
+        print(f"Buscando último registro...")
         last_record = await type_model.filter().order_by('-fecha').first()
 
         if not last_record:
@@ -103,51 +123,87 @@ async def search_per_month(message_data: Dict[str, Any], type_model: Any, value_
                 'message': "No se encontraron datos"
             }
 
-        # Obtener mes y año del último registro
-        last_month = last_record.fecha.month
-        last_year = last_record.fecha.year
+        print(f"Último registro encontrado: {last_record}")
+        fecha = last_record.fecha
+        print(f"Fecha extraída: {fecha}")
 
-        # Buscar registros del mes actual
+        last_year = fecha.year
+        last_month = fecha.month
+        print(f"Año: {last_year}, Mes: {last_month}")
+
+        # Crear fechas de inicio y fin para el mes actual
+        current_month_start = datetime(last_year, last_month, 1).date()
+        if last_month == 12:
+            next_month = datetime(last_year + 1, 1, 1).date()
+        else:
+            next_month = datetime(last_year, last_month + 1, 1).date()
+
+        # Buscar registros del mes actual usando comparación de fechas
         current_month_records = await type_model.filter(
-            fecha__month=last_month,
-            fecha__year=last_year
-        )
+            fecha__gte=current_month_start,
+            fecha__lt=next_month
+        ).all()
+        
+        print(f"Registros mes actual encontrados: {len(current_month_records)}")
 
-        # Buscar registros del mes anterior
-        prev_month = last_month - 1 if last_month > 1 else 12
-        prev_year = last_year if last_month > 1 else last_year - 1
+        # Calcular mes anterior
+        if last_month == 1:
+            prev_month = 12
+            prev_year = last_year - 1
+        else:
+            prev_month = last_month - 1
+            prev_year = last_year
+
+        # Crear fechas de inicio y fin para el mes anterior
+        prev_month_start = datetime(prev_year, prev_month, 1).date()
+        prev_month_end = current_month_start
 
         prev_month_records = await type_model.filter(
-            fecha__month=prev_month,
-            fecha__year=prev_year
-        )
+            fecha__gte=prev_month_start,
+            fecha__lt=prev_month_end
+        ).all()
+        
+        print(f"Registros mes anterior encontrados: {len(prev_month_records)}")
 
         # Calcular medias
-        prom_actual = calculate_mean(current_month_records, value_field_name)
-        prom_anterior = calculate_mean(prev_month_records, value_field_name)
+        prom_actual = round(calculate_mean1(current_month_records, value_field_name), 2)
+        prom_anterior = round(calculate_mean1(prev_month_records, value_field_name), 2)
+        print(f"Promedios calculados - Actual: {prom_actual}, Anterior: {prom_anterior}")
 
         # Obtener nombres de los meses
-        current_month_name = last_record.fecha.strftime('%B')
-        
-        # Ajustar fecha para el mes anterior
-        prev_month_date = last_record.fecha.replace(month=prev_month, year=prev_year)
-        prev_month_name = prev_month_date.strftime('%B')
+        try:
+            locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
+        except:
+            try:
+                locale.setlocale(locale.LC_TIME, 'Spanish_Spain.1252')
+            except:
+                pass
+
+        current_month_name = current_month_start.strftime("%B %Y")
+        prev_month_name = prev_month_start.strftime("%B %Y")
+
+        print(f"Nombres de meses obtenidos - Actual: {current_month_name}, Anterior: {prev_month_name}")
 
         return {
             'success': True,
             'fechaActual': current_month_name,
             'fechaAnterior': prev_month_name,
             'promActual': prom_actual,
-            'promAnterior': prom_anterior
+            'promAnterior': prom_anterior,
+            'tiempo': 'mes',
+            'tipo': value_field_name
         }
 
     except Exception as error:
+        print(f"Error general en search_per_month: {str(error)}")
+        print(f"Tipo de error: {type(error)}")
+        import traceback
+        print(f"Traceback completo: {traceback.format_exc()}")
         return {
             'success': False,
             'message': "Error interno",
             'error': str(error)
         }
-        
         
 async def search_per_day(message_data: Dict[str, Any], type_model: Model, value_field_name: str) -> Dict[str, Any]:
     try:
@@ -164,13 +220,13 @@ async def search_per_day(message_data: Dict[str, Any], type_model: Model, value_
 
         # Buscar registros del día actual
         current_day_records = await type_model.filter(
-            fecha__date=last_date.date()
+            fecha=last_date
         )
 
         # Buscar registros del día anterior
-        prev_date = last_date.date() - timedelta(days=1)
+        prev_date = last_date - timedelta(days=1)
         prev_day_records = await type_model.filter(
-            fecha__date=prev_date
+            fecha=prev_date
         )
 
         # Calcular medias
@@ -186,7 +242,9 @@ async def search_per_day(message_data: Dict[str, Any], type_model: Model, value_
             'fechaActual': fecha_actual,
             'fechaAnterior': fecha_anterior,
             'promActual': prom_actual,
-            'promAnterior': prom_anterior
+            'promAnterior': prom_anterior,
+            'tiempo': 'dia',
+            'tipo': value_field_name
         }
 
     except Exception as error:
@@ -242,7 +300,9 @@ async def search_per_week(message_data: Dict[str, Any], type_model: Any, value_f
             'fechaActual': f'{current_week_start.strftime("%d-%m-%Y")} a {current_week_end.strftime("%d-%m-%Y")}',
             'fechaAnterior': f'{prev_week_start.strftime("%d-%m-%Y")} a {prev_week_end.strftime("%d-%m-%Y")}',
             'promActual': prom_actual,
-            'promAnterior': prom_anterior
+            'promAnterior': prom_anterior,
+            'tiempo': 'semana',
+            'tipo': value_field_name
         }
 
     except Exception as error:
